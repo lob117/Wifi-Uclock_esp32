@@ -10,7 +10,7 @@ import time
 def select(sock,BUFFER_SIZE):
     audio = pyaudio.PyAudio()
     sample_rate = 24000  # Frecuencia de muestreo (debe coincidir)
-    chunk = 25  # Tamaño del buffer de 
+    chunk = 256  # Tamaño del buffer de 
     duration = 11
     audioTotal = (sample_rate // chunk) * duration
     samples_chunk = 0
