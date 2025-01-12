@@ -1,70 +1,86 @@
-import serial
-import pyaudio
-import time
-from scipy.io.wavfile import write
-import numpy as np
-import threading
 import socket
+import pyaudio
 import keyboard
-import time
-def select(sock,BUFFER_SIZE):
-    audio = pyaudio.PyAudio()
-    sample_rate = 24000  # Frecuencia de muestreo (debe coincidir)
-    chunk = 256  # Tamaño del buffer de 
-    duration = 11
-    audioTotal = (sample_rate // chunk) * duration
-    samples_chunk = 0
-    stream = audio.open(format=pyaudio.paUInt8,  # Formato de 8 bits sin signo
-                        channels=1,  # Audio mono
-                        rate=sample_rate,
-                        output=True)
-    samples_chunk = 0
-    buffer = bytearray()  # Buffer temporal para almacenar datos
+import wave
+
+# Configuración del servidor
+ESP32_IP_1 = '192.168.1.101'  # Cambiar por la IP de tu ESP32
+PORT_1 = 8082
+ESP32_IP_2 = '192.168.1.100'  # Cambiar por la IP de tu ESP32
+PORT_2 = 80
+CHUNK_SIZE = 256  # Debe coincidir con el tamaño del buffer en la ESP32
+SAMPLE_RATE = 44100
+
+# Inicializar PyAudio
+p = pyaudio.PyAudio()
+stream = p.open(format=pyaudio.paInt16,
+                channels=1,
+                rate=SAMPLE_RATE,
+                output=True)
+
+# Configurar los sockets
+
+
+client_socket_2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+client_socket_2.connect((ESP32_IP_2, PORT_2))
+
+# Configurar archivos .wav
+output_file_1 = "output_esp32_1.wav"
+output_file_2 = "output_esp32_2.wav"
+
+wave_file_1 = wave.open(output_file_1, 'wb')
+wave_file_1.setnchannels(1)
+wave_file_1.setsampwidth(p.get_sample_size(pyaudio.paInt16))
+wave_file_1.setframerate(SAMPLE_RATE)
+
+wave_file_2 = wave.open(output_file_2, 'wb')
+wave_file_2.setnchannels(1)
+wave_file_2.setsampwidth(p.get_sample_size(pyaudio.paInt16))
+wave_file_2.setframerate(SAMPLE_RATE)
+
+print("Conectado al servidor, reproduciendo audio...")
+
+def sonido(client_socket,wave_file):
     while True:
-        # Leer datos disponibles del puerto serial
-        data, address = sock.recvfrom(BUFFER_SIZE)  
-        buffer.extend(data)  # Añadir datos al buffer
-        # Enviar datos al stream si tenemos un chunk completo
-        if len(buffer) >= chunk:
-            samples_chunk += 1
-            sample.extend(buffer[:chunk])
-            #print(len(sample))
-            stream.write(bytes(buffer[:chunk]))  # Reproducir el chunk
-            buffer = buffer[chunk:]  # Eliminar los datos ya reproducidos
-        if keyboard.is_pressed('esc'):  # Detiene al presionar Esc
+        raw_data = client_socket.recv(CHUNK_SIZE * 2)  # 2 bytes por muestra (16 bits)
+        if raw_data:
+            # Reproducir y guardar audio
+            stream.write(raw_data)
+            wave_file.writeframes(raw_data)
+            if keyboard.is_pressed('e'):  # Detecta si se presionó la tecla "e"
+                print("Cambio de ESP32")
+                break   
+        else:
             break
+try:
+    while True:
+        num = int(input("¿Cuál ESP32 escuchar? (1 o 2): "))
+        
+        if num == 1:
+            sonido(client_socket_1,wave_file_1)
+
+
+        elif num == 2:
+            sonido(client_socket_2,wave_file_2)
+        
+        else :
+            print("Opción no válida. Intente de nuevo.")
+            continue
+
+except KeyboardInterrupt:
+    print("\nDetenido por el usuario.")
+except Exception as e:
+    print("Error:", e)
+finally:
+    # Cerrar recursos
+    print("Cerrando conexiones y guardando archivos...")
     stream.stop_stream()
     stream.close()
-    audio.terminate()
+    p.terminate()
 
+    wave_file_1.close()
+    wave_file_2.close()
 
-# Configuración del socket UDP
-IP = "0.0.0.0"  # Escuchar en todas las interfaces disponibles
-PUERTO_ESP32_1 = 1234
-PUERTO_ESP32_2 = 1235
-BUFFER_SIZE = 256  # Tamaño del paquete a recibir
-
-# Crear el socket UDP
-sock_1 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock_1.bind((IP, PUERTO_ESP32_1))
-sock_2 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock_2.bind((IP, PUERTO_ESP32_2))
-# Configuración del puerto serial
-puerto = 'COM3'  # Cambia según tu sistema ('/dev/ttyUSB0' en Linux)
-baudrate = 4e6  # Velocidad en bps
-sample = []
-nameFile = "casalobato_5m_GLOBO"
-
-# Configurar PyAudio
-
-print("Reproduciendo audio... Presiona Ctrl+C para detener.")
-i = 0
-while True:
-    num=int(input("cual esp32 escuchar? " ))
-    if (num==1):
-        select(sock_1,BUFFER_SIZE)
-    if(num==2):
-        select(sock_2,BUFFER_SIZE)
-    time.sleep(6)
-    if keyboard.is_pressed('esc'):  # Detiene al presionar Esc
-        break
+    client_socket_1.close()
+    client_socket_2.close()
+    print(f"Archivos de audio guardados: {output_file_1}, {output_file_2}")
