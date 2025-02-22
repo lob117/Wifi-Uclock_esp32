@@ -8,7 +8,7 @@ import soundfile as sf
 import sounddevice as sd
 import threading
 # Cargar el modelo entrenado
-model = load_model('gunshot_detection_model_110125.h5')
+model = load_model('GunshotIaModel_v9_old.h5')
 
 def record_audio_from_wifi(esp32_ip, port, duration, sample_rate=22050, chunk_size=256):
     """
@@ -120,7 +120,7 @@ def procesing(esp32_ip, port, duration, sample_rate, chunk_size,nombre):
 duration = 4  # Duración en segundos
 sample_rate = 22050
 chunk_size = 256
-esp32_divice_1=['192.168.1.100',80,"ESP32_1"]
+esp32_divice_1=['192.168.1.100',8081,"ESP32_1"]
 esp32_divice_2=['192.168.1.102',8082,"ESP32_2"]
 esp32_divice_3=['192.168.1.103',8083,"ESP32_3"]
 hilo_esp_1=threading.Thread(target=procesing,args=(esp32_divice_1[0],esp32_divice_1[1], duration, sample_rate, chunk_size,esp32_divice_1[2]))
